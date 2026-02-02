@@ -1,81 +1,102 @@
+import streamlit as st
 import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import warnings
-warnings.filterwarnings('ignore')
-wine_df = pd.read_csv("Lab 22 winequality-red.csv")
-wine_df.head()
-wine_df.tail()
-wine_df.sample(7)
-print(wine_df.columns)
-print(wine_df.shape)
-wine_df.info()
-sns.set(style="whitegrid")
-print(wine_df['quality'].value_counts())
-fig = plt.figure(figsize = (10,6))
-sns.countplot(x='quality',data=wine_df, palette='pastel')
-plt.figure(figsize = (10,8))
-sns.heatmap(wine_df.corr(),annot=True, cmap= 'PuBuGn')
-color = sns.color_palette("pastel")
+warnings.filterwarnings("ignore")
 
-fig, ax1 = plt.subplots(3,4, figsize=(20,30))
-k = 0
-columns = list(wine_df.columns)
-for i in range(3):
-    for j in range(4):
-            sns.distplot(wine_df[columns[k]], ax = ax1[i][j], color = 'red')
-            k += 1
-plt.show()
-wine_df.corr()['quality'].sort_values(ascending=False)
+from imblearn.over_sampling import SMOTE
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+import pickle
+
+st.title("🍷 Wine Quality Prediction - ML Models Comparison")
+
+# -------------------------------
+# Load Data
+# -------------------------------
+@st.cache_data
+def load_data():
+    return pd.read_csv("Lab 22 winequality-red.csv")
+
+wine_df = load_data()
+
+st.subheader("Dataset Preview")
+st.dataframe(wine_df.head())
+
+# -------------------------------
+# Visualization
+# -------------------------------
+st.subheader("Wine Quality Distribution")
+
+fig1 = plt.figure(figsize=(8,5))
+sns.countplot(x='quality', data=wine_df)
+st.pyplot(fig1)
+
+# -------------------------------
+# Prepare Data
+# -------------------------------
 X = wine_df.drop(columns=['quality'])
 y = wine_df['quality']
-y.value_counts()
-from imblearn.over_sampling import SMOTE
+
 oversample = SMOTE(k_neighbors=4)
-# transform the dataset
 X, y = oversample.fit_resample(X.fillna(0), y)
-y.value_counts()
-from sklearn.model_selection import cross_val_score, train_test_split
 
-def classify(model, X, y):
-    x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
-    # train the model
-    model.fit(x_train, y_train)
-    return model.score(x_test, y_test) * 100
-    #print("Accuracy:", model.score(x_test, y_test) * 100)
-    
-#     # cross-validation
-#     score = cross_val_score(model, X, y, cv=5)
-#     print("CV Score:", np.mean(score)*100)
-from sklearn.linear_model import LogisticRegression
-model = LogisticRegression()
-LinearReg_acc=classify(model, X, y)
-LinearReg_acc
-from sklearn.tree import DecisionTreeClassifier
-model = DecisionTreeClassifier()
-DecTree_acc=classify(model, X, y)
-DecTree_acc
-from sklearn.ensemble import RandomForestClassifier
-model = RandomForestClassifier()
-RanFor_acc=classify(model, X, y)
-RanFor_acc
-Accuracy = [LinearReg_acc, DecTree_acc,RanFor_acc,SVM_acc]
-models = ['LogisticRegression', 'DecisionTreeClassifier' , 'RandomForestClassifier', 'Support Vector Machine']
-sns.barplot(x=Accuracy, y=models, color="g")
-plt.xlabel('Accuracy in %')
-plt.title('Accuracy')
-plt.show()
-from sklearn.ensemble import RandomForestClassifier
-RanFor_model = RandomForestClassifier()
-RanFor_acc=classify(RanFor_model, X, y)
-RanFor_acc
-import pickle
-# save the model to disk
-filename = 'finalRF_model.sav'
-pickle.dump(RanFor_model, open(filename, 'wb'))
-# Load the Model back from file
-with open(filename, 'rb') as file:  
-    RF_Model = pickle.load(file)
+# -------------------------------
+# Training Function
+# -------------------------------
+def classify(model):
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.25, random_state=42
+    )
+    model.fit(X_train, y_train)
+    return model.score(X_test, y_test) * 100
 
-RF_Model
+# -------------------------------
+# Train Models
+# -------------------------------
+linear_acc = classify(LogisticRegression(max_iter=2000))
+tree_acc = classify(DecisionTreeClassifier())
+rf_acc = classify(RandomForestClassifier())
+svm_acc = classify(SVC())
+
+# -------------------------------
+# Results
+# -------------------------------
+st.subheader("Model Accuracy (%)")
+
+accuracy = [linear_acc, tree_acc, rf_acc, svm_acc]
+models = ["Logistic Regression", "Decision Tree", "Random Forest", "SVM"]
+
+fig2 = plt.figure(figsize=(8,5))
+sns.barplot(x=accuracy, y=models)
+st.pyplot(fig2)
+
+# -------------------------------
+# Save Random Forest Model
+# -------------------------------
+rf_model = RandomForestClassifier()
+rf_model.fit(X, y)
+
+with open("finalRF_model.sav", "wb") as file:
+    pickle.dump(rf_model, file)
+
+st.success("Random Forest model trained and saved successfully!")
+
+# -------------------------------
+# Prediction Section
+# -------------------------------
+st.subheader("Predict Wine Quality")
+
+input_data = []
+for col in X.columns:
+    val = st.number_input(col)
+    input_data.append(val)
+
+if st.button("Predict"):
+    result = rf_model.predict([input_data])
+    st.success(f"Predicted Wine Quality: {result[0]}")
