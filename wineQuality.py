@@ -4,7 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings('ignore')
-wine_df = pd.read_csv(r"C:\Users\MUKESH\Downloads\Lab 22 winequality-red.csv")
+wine_df = pd.read_csv("Lab 22 winequality-red.csv")
 wine_df.head()
 wine_df.tail()
 wine_df.sample(7)
